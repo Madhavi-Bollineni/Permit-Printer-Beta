@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AP Permit → 58mm Print</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<!-- Libraries load from inside the app first (works with NO internet).
+     If the local copies are missing, they fall back to the internet. -->
+<script src="lib/pdf.min.js"></script>
+<script>if (typeof pdfjsLib === "undefined")
+  document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');</script>
+<script src="lib/jsQR.min.js"></script>
+<script>if (typeof jsQR === "undefined")
+  document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"><\/script>');</script>
+<script>if (typeof jsQR === "undefined")
+  document.write('<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"><\/script>');</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<style>
+  :root{--green:#1b6b3a;--green-dark:#124a28;--paper:#f6f5f1;--ink:#1c1c1c;--line:#d8d5cc}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--paper);
+    color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px;
+    background:
+      linear-gradient(rgba(250,249,244,.90), rgba(250,249,244,.90)),
+      url('splashbg.jpg') center/cover no-repeat fixed;}
+  header{width:100%;max-width:430px;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .mark{width:38px;height:38px;border-radius:8px;background:var(--green);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+  h1{font-size:18px;font-weight:700}
+  .sub{font-size:12.5px;color:#5c5a54;margin-top:2px}
+  main{width:100%;max-width:430px;display:flex;flex-direction:column;gap:12px}
+  .btn{width:100%;padding:16px;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer}
+  .btn:active{transform:translateY(1px)}
+  .btn-pick{background:var(--green);color:#fff}
+  .btn-print{background:var(--ink);color:#fff;display:none}
+  .row{display:none;gap:10px}
+  .row .btn{font-size:14px;font-weight:600;padding:12px;background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+  #status{font-size:13.5px;padding:10px 12px;border-radius:8px;background:#fff;border:1.5px solid var(--line);display:none}
+  #status.err{border-color:#c04a3a;color:#8c2f22;background:#fdf1ef}
+  #status.ok{border-color:var(--green);color:var(--green-dark);background:#eef6f0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--green);color:#fff;
+    font-size:11px;font-weight:700;margin-right:6px;vertical-align:1px}
+  .preview-wrap{display:none;background:#e4e2da;border-radius:12px;padding:18px 0;justify-content:center}
+  #receipt{width:232px;image-rendering:pixelated;box-shadow:0 6px 24px rgba(0,0,0,.25);background:#fff}
+  footer{margin-top:auto;padding:18px 12px 56px 104px;font-size:11.5px;color:#8b887f;
+    text-align:center;max-width:430px}
+  body{padding-bottom:56px}
+  input[type=file]{display:none}
+  .setrow{padding:13px 14px;border-radius:10px;border:1.5px solid var(--line);
+    background:#fff;color:var(--ink);font-size:14px;text-align:left;cursor:pointer}
+  .pill{padding:9px 16px;border-radius:999px;border:1.5px solid var(--line);
+    background:#fff;font-size:13px;font-weight:700;cursor:pointer}
+  .pill.on{background:#1b6b3a;color:#fff;border-color:#1b6b3a}
+  /* ---------- splash ---------- */
+  #splash{position:fixed;inset:0;z-index:9999;
+    background:
+      linear-gradient(180deg, rgba(127,211,154,.82) 0%, rgba(99,196,131,.78) 45%, rgba(79,184,117,.85) 100%),
+      url('splashbg.jpg') center/cover no-repeat;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    transition:opacity .5s ease, visibility .5s ease}
+  #splash.hide{opacity:0;visibility:hidden}
+  #splash .ring{width:190px;height:190px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.15);
+    animation:pop .8s cubic-bezier(.2,.9,.3,1.3) both}
+  #splash .ring img{width:150px;height:150px;border-radius:50%}
+  #splash h2{margin-top:26px;color:#fff;font-size:23px;font-weight:800;text-align:center;
+    text-shadow:0 1px 6px rgba(0,60,25,.35);
+    letter-spacing:.2px;animation:rise .7s .25s ease both;padding:0 18px}
+  #splash p{margin-top:8px;color:#f2fff7;font-size:16px;text-align:center;
+    text-shadow:0 1px 5px rgba(0,60,25,.35);
+    animation:rise .7s .4s ease both}
+  #splash .foot{position:absolute;bottom:22px;left:20px;color:#eafff2;font-size:12px;
+    animation:rise .7s .55s ease both;line-height:1.45}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+  @keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+  #printerBar{display:none;gap:8px;align-items:center}
+  #printerBtn{flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);
+    background:#fff;color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+
+</style>
+</head>
+<body>
+<div id="splash">
+  <div class="ring"><img src="applogo.png" alt=""></div>
+  <h2>Agricultural Market Committee</h2>
+  <p style="margin-top:2px;color:#fff;font-weight:800;letter-spacing:2px;font-size:13px">B E T A</p>
+  <p>Palamaner, Chittoor District</p>
+  <div class="foot"><span id="splashVer"></span></div>
+</div>
+
+<header>
+  <div class="brand">
+    <div class="mark">58</div>
+    <div>
+      <h1>AP Permit → Thermal Print</h1>
+      <div class="sub">e-Transport Permit • Market Yard & Check Post • 58mm</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div style="display:flex;gap:8px">
+    <button class="btn" id="p58" style="flex:1;font-size:13px;padding:9px;background:#1b6b3a;color:#fff">58mm printer</button>
+    <button class="btn" id="p80" style="flex:1;font-size:13px;padding:9px;background:#fff;border:1.5px solid var(--line);color:var(--ink)">80mm printer</button>
+  </div>
+  <div id="printerBar">
+    <button id="setBtn" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);
+      background:#fff;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer">⚙️ Settings</button>
+    <button id="histBtn" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);
+      background:#fff;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer">🕘 History</button>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div id="setModal" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:9996;
+    padding:20px 16px;overflow:auto">
+    <h2 style="margin:0 0 16px">Settings</h2>
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:430px">
+      <button id="sPrinter" class="setrow">🖨️ Printer : <span id="sPrinterName">not selected</span></button>
+      <div class="setrow" style="display:flex;gap:8px;align-items:center">
+        <span style="flex:1">Paper size</span>
+        <button id="s58" class="pill">58mm</button>
+        <button id="s80" class="pill">80mm</button>
+      </div>
+      <label class="setrow" style="display:flex;gap:10px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="sAuto" style="width:20px;height:20px">
+        <span style="flex:1">Auto-print when a permit is shared<br>
+        <small style="color:#8b887f">Share from WhatsApp → prints immediately, no taps</small></span>
+      </label>
+      <button id="sTest" class="setrow">🧾 Print a test page</button>
+      <button id="sUpd" class="setrow">🔄 Check for updates</button>
+      <div class="setrow" style="color:#8b887f">AMC Permit Print (Beta) — <span id="sVer">Version</span></div>
+      <button id="sClose" style="margin-top:8px;padding:13px;border-radius:10px;border:none;
+        background:#1b6b3a;color:#fff;font-size:15px;font-weight:700">Done</button>
+    </div>
+  </div>
+
+  <!-- ============ HISTORY ============ -->
+  <div id="histModal" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:9996;
+    padding:20px 16px;overflow:auto">
+    <h2 style="margin:0 0 6px">History</h2>
+    <p style="margin:0 0 14px;color:#8b887f;font-size:13px">Last receipts on this phone. Tap one to reprint.</p>
+    <div id="histGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px"></div>
+    <button id="hClose" style="margin-top:16px;padding:13px 22px;border-radius:10px;border:none;
+      background:#1b6b3a;color:#fff;font-size:15px;font-weight:700">Close</button>
+  </div>
+  <button class="btn btn-pick" id="pickBtn">📄 Select Permit PDF</button>
+  <input type="file" id="file" accept="application/pdf,image/*">
+  <div id="status"></div>
+  <div class="preview-wrap" id="previewWrap"><canvas id="receipt" width="384"></canvas></div>
+  <button class="btn btn-print" id="printBtn">🖨️ Print via RawBT</button>
+  <button class="btn" id="bigQrBtn" style="display:none;background:#fff;
+    border:1.5px solid var(--line);color:var(--ink);font-size:14px;padding:12px">
+    🔍 Show QR full size (scan from screen)</button>
+  <div id="qrModal" style="display:none;position:fixed;inset:0;background:#fff;z-index:9998;
+    align-items:center;justify-content:center;flex-direction:column;gap:14px">
+    <canvas id="bigQr" style="image-rendering:pixelated;width:88vw;max-width:420px"></canvas>
+    <button id="closeQr" style="padding:12px 22px;border-radius:10px;border:none;
+      background:#1b6b3a;color:#fff;font-size:15px;font-weight:700">Close</button>
+  </div>
+  <div class="row" id="altRow">
+    <button class="btn" id="sysBtn">System Print (PC)</button>
+    <button class="btn" id="shareBtn">Share to print app</button>
+    <button class="btn" id="dlBtn">Download image</button>
+  </div>
+</main>
+
+<footer>Prints a convenience copy with the original scannable QR.
+The PDF on your phone remains the official permit.</footer>
+<div id="verTag" style="position:fixed;left:12px;bottom:10px;font-size:11px;
+  color:#8b887f;line-height:1.35;background:var(--paper);
+  padding:4px 8px 4px 0;border-radius:6px;z-index:5">
+  <span id="verNum">Version</span></div>
+<div id="infoModal" style="display:none;position:fixed;inset:0;background:#fff;z-index:9997;
+  padding:22px 18px;overflow:auto">
+  <pre id="infoText" style="white-space:pre-wrap;font-size:13px;line-height:1.5;
+    font-family:ui-monospace,Menlo,monospace;color:#1c1c1c"></pre>
+  <button id="infoClose" style="margin-top:14px;padding:12px 22px;border-radius:10px;border:none;
+    background:#1b6b3a;color:#fff;font-size:15px;font-weight:700">Close</button>
+</div>
+
+<script>
+// Local worker when bundled, internet copy otherwise
+(function(){
+  const local = "lib/pdf.worker.min.js";
+  const cdn = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  try{
+    const x = new XMLHttpRequest();
+    x.open("HEAD", local, false); x.send(null);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = (x.status===200 || x.status===0) ? local : cdn;
+  }catch(e){ pdfjsLib.GlobalWorkerOptions.workerSrc = cdn; }
+})();
+
+const $ = id => document.getElementById(id);
+function setStatus(html, cls){ const s=$("status"); s.innerHTML=html; s.className=cls||""; s.style.display="block"; }
+const clean = s => s ? s.trim().replace(/\s+/g," ") : "-";
+function paperDotsIsNarrow(){ return (typeof paperDots!=="undefined") && paperDots<=448; }
+const num = s => parseFloat(String(s).replace(/,/g,"")) || 0;
+
+setTimeout(()=>{ const sp=$("splash"); if(sp) sp.classList.add("hide"); }, 1700);
+
+// ---- inside the Android app: printer button, version, update check ----
+
+window.refreshPrinterName = function(){
+  if(!window.AndroidPrinter || !AndroidPrinter.savedPrinterName) return;
+  const n = AndroidPrinter.savedPrinterName();
+  const el=$("sPrinterName"); if(el) el.textContent = (n && n.length ? n : "not selected");
+};
+function paintPaperPills(){
+  $("s58").classList.toggle("on", paperDots<=448);
+  $("s80").classList.toggle("on", paperDots>448);
+}
+if (window.AndroidPrinter) {
+  $("printerBar").style.display = "flex";
+  $("setBtn").onclick = () => { refreshPrinterName(); paintPaperPills();
+    $("sAuto").checked = localStorage.getItem("autoPrint")==="1";
+    $("setModal").style.display="block"; };
+  $("sClose").onclick = () => { $("setModal").style.display="none"; };
+  $("sPrinter").onclick = () => AndroidPrinter.selectPrinter();
+  $("s58").onclick = () => { paperDots=384; localStorage.setItem("paperDots",384); paintPaperPills(); if(lastPermit) drawReceipt(lastPermit); };
+  $("s80").onclick = () => { paperDots=576; localStorage.setItem("paperDots",576); paintPaperPills(); if(lastPermit) drawReceipt(lastPermit); };
+  $("sAuto").onchange = e => localStorage.setItem("autoPrint", e.target.checked ? "1" : "0");
+  $("sTest").onclick = () => { try{ AndroidPrinter.testPrint(); setStatus("Sending test page\u2026","ok"); }catch(e){} $("setModal").style.display="none"; };
+  $("sUpd").onclick = () => AndroidPrinter.checkUpdateNow();
+  try{ if(AndroidPrinter.appVersion) $("sVer").textContent = "Version " + AndroidPrinter.appVersion(); }catch(e){}
+  $("histBtn").onclick = () => { renderHistory(); $("histModal").style.display="block"; };
+  $("hClose").onclick = () => { $("histModal").style.display="none"; };
+  // this build prints directly - no RawBT, no system share sheet
+  const _lbl = () => {
+    const pb=$("printBtn"); if(pb) pb.textContent = "\uD83D\uDDA8\uFE0F  Print";
+    const sb=$("shareBtn"); if(sb) sb.style.display="none";
+  };
+  _lbl();
+  document.addEventListener("DOMContentLoaded", _lbl);
+  try{
+    if(AndroidPrinter.appVersion){
+      const v = "Version " + AndroidPrinter.appVersion();
+      $("verNum").textContent = v;
+      const sv = $("splashVer"); if(sv) sv.textContent = v;
+    }
+  }catch(e){}
+  refreshPrinterName();
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshPrinterName(); });
+
+  // hidden project-info screen: press and hold the version for 5 seconds
+  let holdTimer=null;
+  const vt=$("verTag");
+  const startHold=()=>{ holdTimer=setTimeout(()=>{
+      try{ $("infoText").textContent = AndroidPrinter.projectInfo(); }catch(e){ return; }
+      $("infoModal").style.display="block";
+    }, 5000); };
+  const cancelHold=()=>{ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } };
+  vt.addEventListener("touchstart", startHold);
+  vt.addEventListener("mousedown", startHold);
+  for(const ev of ["touchend","touchcancel","mouseup","mouseleave"])
+    vt.addEventListener(ev, cancelHold);
+  $("infoClose").onclick=()=>{ $("infoModal").style.display="none"; };
+}
+
+let paperDots = (localStorage.getItem("paperDots")|0) || 384;
+let lastPermit = null;
+function paintPaperBtns(){
+  if (window.AndroidPrinter) {
+    const r = $("p58") && $("p58").parentElement; if(r) r.style.display = "none";
+  }
+  const on = {background:"#1b6b3a",color:"#fff",border:"none"};
+  const off = {background:"#fff",color:"#1c1c1c",border:"1.5px solid #d8d5cc"};
+  const a = paperDots===384 ? on : off, b = paperDots===384 ? off : on;
+  Object.assign($("p58").style, a); Object.assign($("p80").style, b);
+  $("receipt").style.width = paperDots===384 ? "232px" : "330px";
+}
+function setPaper(d){
+  paperDots = d;
+  try{ localStorage.setItem("paperDots", d); }catch(e){}
+  paintPaperBtns();
+  if(lastPermit) drawReceipt(lastPermit);
+}
+$("p58").onclick = () => setPaper(384);
+$("p80").onclick = () => setPaper(576);
+paintPaperBtns();
+
+let _shareBuf="";
+window.shareBegin = () => { _shareBuf=""; };
+window.shareChunk = t => { _shareBuf += t; };
+window.shareEnd = (mime,name) => {
+  const bin = atob(_shareBuf); _shareBuf="";
+  const a = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i);
+  handlePdf(new File([a], name||"permit", {type:mime||"application/pdf"}));
+};
+window.appStatus = (m, ok) => setStatus(m, ok ? "ok" : "err");
+
+// ---------- history (last 10 receipts, stored on the phone) ----------
+function loadHist(){ try{ return JSON.parse(localStorage.getItem("hist")||"[]"); }catch(e){ return []; } }
+function saveToHistory(p){
+  try{
+    const png = $("receipt").toDataURL("image/png");
+    let h = loadHist();
+    h.unshift({no:p.permitNo, name:p.partyName, t:Date.now(), dots:paperDots, png:png});
+    h = h.slice(0,10);
+    while(h.length){
+      try{ localStorage.setItem("hist", JSON.stringify(h)); break; }
+      catch(e){ h.pop(); }                    // storage full: drop oldest
+    }
+  }catch(e){}
+}
+function renderHistory(){
+  const g=$("histGrid"); g.innerHTML="";
+  const h=loadHist();
+  if(!h.length){ g.innerHTML='<p style="color:#8b887f">Nothing printed yet.</p>'; return; }
+  for(const it of h){
+    const d=document.createElement("div");
+    d.style.cssText="border:1.5px solid var(--line);border-radius:10px;background:#fff;padding:8px;cursor:pointer;text-align:center";
+    const dt=new Date(it.t);
+    d.innerHTML=`<img src="${it.png}" style="width:100%;image-rendering:pixelated;border:1px solid #eee">
+      <div style="font-size:12px;font-weight:700;margin-top:6px">${it.no}</div>
+      <div style="font-size:11px;color:#8b887f">${dt.getDate()}/${dt.getMonth()+1} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,"0")}</div>`;
+    d.onclick=()=>{
+      if(window.AndroidPrinter){
+        try { AndroidPrinter.print(it.png, it.dots||384); }
+        catch(e){ AndroidPrinter.print(it.png); }
+        setStatus(`Reprinting permit ${it.no}\u2026`,"ok");
+        $("histModal").style.display="none";
+      }
+    };
+    g.appendChild(d);
+  }
+}
+
+$("pickBtn").onclick = () => $("file").click();
+$("file").onchange = e => { if(e.target.files[0]) handlePdf(e.target.files[0]); };
+
+// PWA: service worker + auto-open shared PDFs
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+  if (new URLSearchParams(location.search).get("shared") === "1") {
+    caches.open("shared-pdf").then(c=>c.match("shared.pdf")).then(r=>r&&r.blob())
+      .then(b=>{ if(b) handlePdf(new File([b],"permit.pdf",{type:"application/pdf"})); }).catch(()=>{});
+  }
+}
+
+// ================= Permit intake: PDF or photo =================
+async function handlePdf(file){
+  try{
+    setStatus("Reading permit\u2026");
+    let text = "", big, pdfPage = null;
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name||"");
+    if(isPdf){
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+      const page = await pdf.getPage(1);
+      pdfPage = page;
+      try{ text = (await page.getTextContent()).items.map(i=>i.str).join("\n"); }catch(e){}
+      const scale = 2000 / page.getViewport({scale:1}).width;
+      const vp = page.getViewport({scale});
+      big = document.createElement("canvas");
+      big.width = vp.width; big.height = vp.height;
+      const bctx = big.getContext("2d");
+      bctx.fillStyle="#fff"; bctx.fillRect(0,0,big.width,big.height);
+      await page.render({canvasContext: bctx, viewport: vp}).promise;
+    } else {
+      big = await imageToCanvas(file);
+    }
+
+    let ocrUsed = false;
+    if(text.replace(/\s/g,"").length < 80 && typeof Tesseract !== "undefined"){
+      try{
+        setStatus("Photo detected \u2014 reading text (OCR)\u2026 first time downloads ~11MB");
+        const r = await Tesseract.recognize(big, "eng", {logger: m => {
+          if(m.status === "recognizing text")
+            setStatus(`Reading photo\u2026 ${Math.round(m.progress*100)}%`);
+        }});
+        text = r.data.text || "";
+        ocrUsed = true;
+      }catch(e){
+        setStatus("Photo text needs internet the first time \u2014 printing with QR data only.","ok");
+      }
+    }
+
+    let q = null;
+    if(isPdf && pdfPage){
+      const emb = await qrFromPdfImage(pdfPage);
+      if(emb){
+        const g = modulesFromCleanImage(emb.canvas, emb.result);
+        if(g){
+          // confirm the exact grid reproduces the same payload
+          const S=8, vc=document.createElement("canvas");
+          const grid=g.N+8;
+          vc.width=vc.height=grid*S;
+          const vx=vc.getContext("2d");
+          vx.fillStyle="#fff"; vx.fillRect(0,0,vc.width,vc.height);
+          vx.fillStyle="#000";
+          for(let j=0;j<g.N;j++)for(let i=0;i<g.N;i++)
+            if(g.mods[j*g.N+i]) vx.fillRect((i+4)*S,(j+4)*S,S,S);
+          const chk=jsQR(vx.getImageData(0,0,vc.width,vc.height).data,vc.width,vc.height);
+          if(chk && chk.data===emb.result.data){
+            const holder=document.createElement("canvas");
+            holder.width=holder.height=g.N;
+            holder.isModule=true; holder.verified=true;
+            holder.mods=g.mods; holder.N=g.N; holder.fromPdfImage=true;
+            // the department's own pixels, cropped to the code itself
+            const cropped = cropCodeFromImage(emb.canvas);
+            holder.exact = cropped ? reduceToModules(cropped, g.N) : emb.canvas;
+            holder.exactFull = emb.canvas;
+            q = {canvas:holder, data:emb.result.data};
+          }
+        }
+      }
+    }
+    if(!q) q = await findQr(big);          // fallback: locate it on the page
+
+    const pay = q && q.data ? payloadFields(q.data) : {};
+    const isCheckpost = /Check Post Information/i.test(text) ||
+      (!/Market Yard Information/i.test(text) &&
+       (pay.typeCode === "NTP" || !!pay.from));
+    const cleanText = stripWatermark(text || "");
+    const p = isCheckpost ? parseCheckpost(cleanText) : parseMarketYard(cleanText);
+    mergePayload(p, pay, isCheckpost);
+    if(ocrUsed){
+      if(pay.permitNo) p.permitNo = pay.permitNo;
+      if(pay.permitType) p.permitType = pay.permitType;
+      if(pay.mobile) p.partyMob = pay.mobile;
+      if(isCheckpost){
+        if(pay.from) p.from = pay.from;
+        if(pay.departure) p.departure = pay.departure;
+        if(pay.to) p.to = pay.to;
+        if(pay.arrival) p.arrival = pay.arrival;
+      }
+      p.ocr = true;
+    }
+    p.qr = q ? q.canvas : null;
+    window._lastQr = (q && q.canvas.isModule) ? q.canvas : null;
+    p.kind = isCheckpost ? "checkpost" : "market";
+    lastPermit = p;
+    drawReceipt(p);
+
+    $("previewWrap").style.display="flex";
+    $("printBtn").style.display="block";
+    $("altRow").style.display="flex";
+    $("bigQrBtn").style.display = (q && q.canvas.isModule) ? "block" : "none";
+    if(window.AndroidPrinter){ const sb=$("shareBtn"); if(sb) sb.style.display="none"; }
+    const badge = isCheckpost ? "CHECK POST" : "MARKET YARD";
+    // The receipt's own QR has just been scanned in-app (jsQR over the
+    // exact pixels that will print). Report that result plainly.
+    let note = "";
+    const printed = $("receipt").qrPrintOk;
+    const sameData = q && q.data && $("receipt").qrPrintData === q.data;
+    if(!q) note = " \u26A0 QR not found \u2014 printed without QR.";
+    else if(printed === true && sameData) note = " QR scanned in-app \u2714 data exact.";
+    else if(printed === true) note = " QR scanned in-app \u2714";
+    else if(printed === false) note = " \u26A0 QR did NOT scan in-app \u2014 reload the permit or use 80mm.";
+    else note = " (QR self-check unavailable \u2014 needs internet once to load the scanner)";
+    if(window.AndroidPrinter && localStorage.getItem("autoPrint")==="1" && printed !== false){
+      const dataUrl=$("receipt").toDataURL("image/png");
+      try { AndroidPrinter.print(dataUrl, paperDots); } catch(e){ try{AndroidPrinter.print(dataUrl);}catch(_){} }
+      note += " Auto-printing\u2026";
+      saveToHistory(p);
+    }
+    let msg = `<span class="badge">${badge}</span>Permit ${p.permitNo} \u2014 ${p.partyName}.${note}`;
+    if(p.items.length>1) msg += ` (${p.items.length} commodities \u2014 please verify amounts)`;
+    if(ocrUsed) msg += " Details read from photo (OCR) \u2014 verify.";
+    setStatus(msg,"ok");
+  }catch(err){
+    setStatus("Could not read this file: "+err.message,"err");
+  }
+}
+
+async function imageToCanvas(file){
+  const url = URL.createObjectURL(file);
+  const img = await new Promise((res,rej)=>{
+    const im = new Image();
+    im.onload = ()=>res(im);
+    im.onerror = ()=>rej(new Error("cannot open this image"));
+    im.src = url;
+  });
+  const MAX = 2400;
+  const k = Math.min(1, MAX/Math.max(img.width,img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width*k);
+  c.height = Math.round(img.height*k);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
+  ctx.drawImage(img,0,0,c.width,c.height);
+  URL.revokeObjectURL(url);
+  return c;
+}
+
+// Fields embedded inside the permit QR itself (works even for photos/scans)
+function payloadFields(d){
+  const get = k => {
+    const m = d.match(new RegExp(k+"\\s*:\\s*([\\s\\S]*?)(?=,[A-Za-z][A-Za-z ]*\\s*:|\\}|$)","i"));
+    return m ? clean(m[1]).replace(/[,\s]+$/,"") : "";
+  };
+  const splitPlace = v => {
+    const m = v.match(/^([\s\S]*)\s*\(([^()]*)\)\s*$/);
+    return m ? {place: clean(m[1]), time: clean(m[2])} : {place: v, time: ""};
+  };
+  const typeCode = get("Permit Type");
+  const names = {NVTP:"Voluntary Trader Permit", NTP:"Non-Trader Permit",
+                 TP:"Trader Permit", VTP:"Voluntary Trader Permit"};
+  const tf = get("Trip From") ? splitPlace(get("Trip From")) : null;
+  const tt = get("Trip To") ? splitPlace(get("Trip To")) : null;
+  return {
+    permitNo: get("Permit No"),
+    typeCode,
+    permitType: names[typeCode] || typeCode,
+    mobile: get("Trader Mobile") || get("Seller Mobile") || get("Mobile"),
+    from: tf ? tf.place : "", departure: tf ? tf.time : "",
+    to: tt ? tt.place : "", arrival: tt ? tt.time : ""
+  };
+}
+
+function mergePayload(p, pay, isCheckpost){
+  const fill = (k,v)=>{ if((p[k]==="-"||p[k]===""||p[k]==null) && v) p[k]=v; };
+  fill("permitNo", pay.permitNo);
+  fill("permitType", pay.permitType);
+  fill("partyMob", pay.mobile);
+  if(isCheckpost){
+    // The QR carries the exact trip text - always prefer it over page layout
+    if(pay.from) p.from = pay.from;
+    if(pay.departure) p.departure = pay.departure;
+    if(pay.to) p.to = pay.to;
+    if(pay.arrival) p.arrival = pay.arrival;
+    fill("from", pay.from); fill("departure", pay.departure);
+    fill("to", pay.to); fill("arrival", pay.arrival);
+  }
+}
+
+// ================= Shared field extraction =================
+// The page carries a diagonal "Department of Agricultural Marketing" watermark
+// whose words land between labels and values. Remove those lines first.
+function stripWatermark(t){
+  return t.replace(/^[ \t]*(?:Department of Agricultural Marketing|Department|of Agricultural|Marketing)[ \t]*$/gmi, "");
+}
+
+function commonFields(text){
+  const find=(re,d="-")=>{const m=text.match(re);return m?clean(m[1]):d;};
+  return {
+    permitNo: find(/\b(\d{8})\b/),
+    permitType: find(/\n\s*([A-Za-z][A-Za-z- ]*? Permit)\s*\n/i),
+    dateTime: find(/(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} [ap]m)/i),
+    amcName: find(/AMC Name\s*([\s\S]+?)\s*(?:Market Yard Name|Check Post Name)/i),
+    officer: find(/Officer Name\s*([\s\S]+?)\s*Officer Mobile No/i),
+    officerMob: find(/Officer Mobile No\s*[\s\S]*?(\d{10})/i),
+    generated: find(/Generated on\s*:\s*(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} [ap]m)/i),
+    find
+  };
+}
+
+// Multi-commodity: pairs money values row-wise vs column-wise,
+// keeps whichever pairing matches the permit's own TOTAL.
+function parseCommodities(text, feeWord){
+  const cb = text.match(/Commodity Details([\s\S]+?)TOTAL/i);
+  const b = cb ? cb[1] : "";
+  const labels = new Set(["s.no","commodity","trade value (inr)","quantity","unit",
+    "user charge (inr)","market fee (inr)","department of agricultural marketing"]);
+  const unitsSet = new Set(["QTL","KG","KGS","TON","TONS","BAG","BAGS","NOS"]);
+  const wm = new Set(["department","of","agricultural","marketing"]);
+  const isWm = t => { const ws=t.toLowerCase().split(/\s+/);
+    return ws.length>0 && ws.every(w=>wm.has(w)); };
+  const names = b.split("\n").map(l=>l.trim()).filter(l =>
+    l.length>1 && /^[A-Za-z][A-Za-z ]*$/.test(l) &&
+    !labels.has(l.toLowerCase()) && !unitsSet.has(l.toUpperCase()) && !isWm(l));
+  const money = [...b.matchAll(/([\d,]+\.\d{2})/g)].map(m=>m[1]);
+  let qtys  = [...b.matchAll(/\b(\d+\.\d)(?!\d)/g)].map(m=>m[1]);
+  if(!qtys.length) qtys = [...b.matchAll(/\n\s*(\d{2,6})\s*\n/g)].map(m=>m[1]);
+  const units = [...b.matchAll(/\b(QTL|KGS?|TONS?|BAGS?|NOS)\b/gi)].map(m=>m[1]);
+
+  let tm = text.match(/TOTAL\s*([\s\S]+?)\((ONLINE|CASH PAYMENT|CASH|UPI|DD|CHEQUE)\)/i);
+  if(!tm){ const t2 = text.match(/TOTAL\s*([\s\S]{0,400})/i); tm = t2 ? [t2[0],t2[1],""] : null; }
+  const tMoney = tm ? [...tm[1].matchAll(/([\d,]+\.\d{2})/g)].map(m=>m[1]) : [];
+  const totalTrade = tMoney[0] || "-";
+  const totalFee = (tMoney.length>1 ? tMoney[tMoney.length-1] : "-") +
+                   (tm && tm[2] ? ` (${tm[2].toUpperCase()})` : "");
+  const middles = tMoney.length>2 ? tMoney.slice(1,-1) : [];
+
+  const N = Math.max(names.length, 1);
+  let trades, fees;
+  if(N === 1 || money.length !== 2*N){
+    trades = money.slice(0,N); while(trades.length<N) trades.push("-");
+    fees = money.slice(N, 2*N);
+    if(fees.length < N && middles.length >= N - fees.length)
+      fees = fees.concat(middles.slice(0, N - fees.length));
+    while(fees.length<N) fees.push("-");
+  } else {
+    const row = {t: money.filter((_,i)=>i%2===0), f: money.filter((_,i)=>i%2===1)};
+    const col = {t: money.slice(0,N), f: money.slice(N)};
+    const sum = a => a.reduce((s,v)=>s+num(v),0);
+    const target = num(totalTrade);
+    const pick = Math.abs(sum(col.t)-target) <= Math.abs(sum(row.t)-target) ? col : row;
+    trades = pick.t; fees = pick.f;
+  }
+  const items = [];
+  for(let i=0;i<N;i++) items.push({
+    sNo: String(i+1),
+    name: names[i] || "-",
+    trade: trades[i] || "-",
+    qty: (qtys[i] || "-") + " " + (units[i] || units[0] || ""),
+    fee: fees[i] || "-",
+    feeWord
+  });
+  return {items, totalTrade, totalFee};
+}
+
+// ================= Market Yard permit =================
+function parseMarketYard(text){
+  const c = commonFields(text);
+  const tb = text.match(/Trader Information([\s\S]+?)Commodity Details/i);
+  const mob = tb && tb[1].match(/\b(\d{10})\b/);
+  return Object.assign(c, parseCommodities(text,"User Charge"), {
+    marketYard: c.find(/Market Yard Name\s*([\s\S]+?)\s*Officer Name/i),
+    partyLabel: "Trader Name",
+    partyName: c.find(/Trader Name\s*([\s\S]+?)\s*(?:Mobile No|Address)/i),
+    partyMob: mob ? mob[1] : "-",
+    address: c.find(/Address\s*([\s\S]+?)\s*(?:Mobile No|Consignee|Payment Information|Commodity Details|\b\d{10}\b)/i),
+    transMob: (()=>{const t=text.match(/Transporter\s*\n?\s*(?:Information|Mobile)([\s\S]+)$/i);
+      const m=t&&t[1].match(/\b(\d{10})\b/);return m?m[1]:"-";})(),
+    vehicle: c.find(/Vehicle No\s*[\s\S]*?\b([A-Z]{2}\d{2}[A-Z]{1,2}\d{4})\b/)
+  });
+}
+
+// TRIP DETAILS layout: "FROM" and "TO" labels first, then the two addresses
+// as separate blank-line-separated blocks, then the two date-times.
+function tripFromTo(tt){
+  const afterLabels = tt.match(/FROM\s*\n[\s\S]*?TO\s*\n([\s\S]*?)(?=\d{2}-\d{2}-\d{4})/i);
+  if(afterLabels){
+    const blocks = afterLabels[1].split(/\n\s*\n/)
+      .map(b => clean(b.replace(/\u27ea|\u27eb|\u279a|➪/g,"")))
+      .filter(b => b && b !== "-");
+    if(blocks.length >= 2) return {from: blocks[0], to: blocks.slice(1).join(" ")};
+    if(blocks.length === 1){
+      const lines = blocks[0].split(" ");
+      return {from: blocks[0], to: "-"};
+    }
+  }
+  const f = tt.match(/FROM\s*([\s\S]+?)\s*\d{2}-\d{2}-\d{4}/i);
+  const t = tt.match(/TO\s*([\s\S]+?)\s*\d{2}-\d{2}-\d{4}/i);
+  return {from: clean(f?f[1]:"-").replace(/\s*TO$/i,""), to: clean(t?t[1]:"-")};
+}
+
+// ================= Check Post permit =================
+function parseCheckpost(text){
+  const c = commonFields(text);
+  const sb = text.match(/Seller Information([\s\S]+?)(?:Payment Information|Commodity Details)/i);
+  const mob = sb && sb[1].match(/\b(\d{10})\b/);
+  const dts = [...text.matchAll(/(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} [ap]m)/gi)].map(m=>m[1]);
+  const tripBlock = text.match(/TRIP DETAILS([\s\S]+)$/i);
+  const tt = tripBlock ? tripBlock[1] : "";
+  const tripDts = [...tt.matchAll(/(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} [ap]m)/gi)].map(m=>m[1]);
+  return Object.assign(c, parseCommodities(text,"Market Fee"), {
+    checkPost: c.find(/Check Post Name\s*([\s\S]+?)\s*Officer Name/i),
+    partyLabel: "Seller Name",
+    partyName: c.find(/Seller Name\s*([\s\S]+?)\s*(?:Mobile No|Address)/i),
+    partyMob: mob ? mob[1] : "-",
+    address: c.find(/Address\s*([\s\S]+?)\s*(?:Mobile No|Consignee|Payment Information|Commodity Details|\b\d{10}\b)/i),
+    payMode: (()=>{
+      const seg = text.match(/Payment Mode([\s\S]{0,300})/i);
+      if(seg){
+        const known = seg[1].match(/\b(CASH PAYMENT|ONLINE|UPI|CHEQUE|DD|CASH)\b/i);
+        if(known) return known[1].toUpperCase();
+      }
+      const m = text.match(/Payment Mode\s*([\s\S]+?)\s*(?:Commodity Details|\n\s*\n)/i);
+      if(!m) return "-";
+      const v = clean(m[1]).replace(/Department of Agricultural Marketing/ig,"").trim();
+      return v || "-";
+    })(),
+    consigneeName: c.find(/Consignee\s*\n?\s*Name\s*([\s\S]+?)\s*(?:Mobile No|Payment Information|Commodity Details)/i),
+    consigneeMob: (()=>{
+      const b = text.match(/Consignee Information([\s\S]+?)(?:Payment Information|Commodity Details)/i);
+      let m = b && b[1].match(/\b(\d{10})\b/);
+      if(m) return m[1];
+      const sb = text.match(/Seller Information([\s\S]+?)(?:Consignee Information|Payment Information|Commodity Details)/i);
+      const all = sb ? [...sb[1].matchAll(/\b(\d{10})\b/g)].map(x=>x[1]) : [];
+      return all.length > 1 ? all[1] : "-";
+    })(),
+    from: tripFromTo(tt).from,
+    to: tripFromTo(tt).to,
+    departure: tripDts[0] || dts[1] || "-",
+    arrival: tripDts[1] || dts[2] || "-",
+    distance: c.find(/Estimated Distance\s*:?\s*([\d.]+\s*KM)/i),
+    transName: c.find(/Transporter Name\s*([\s\S]+?)\s*Transporter Mobile/i),
+    transMob: (()=>{const m=text.match(/Transporter Mobile\s*[\s\S]*?(\d{10})/i);return m?m[1]:"-";})(),
+    vehicleType: (()=>{
+      const m1 = text.match(/Vehicle Type\s*([\s\S]+?)\s*Vehicle No/i);
+      if(m1 && !/Department|Marketing/i.test(m1[1])) return clean(m1[1]);
+      const m2 = text.match(/Vehicle Type\s*((?:\s*\n)*(?:\s*[\u27ea\u27eb\u279a➪]\s*\n)*\s*[^\n]+)/i);
+      return m2 ? clean(m2[1].replace(/[\u27ea\u27eb\u279a➪]/g,"")) : "-";
+    })(),
+    vehicle: c.find(/Vehicle No\s*[\s\S]*?\b([A-Z]{2}\d{2}[A-Z]{1,2}\d{4})\b/)
+  });
+}
+
+// ================= Receipt drawing (finalized layouts) =================
+
+// Chooses the biggest whole-dot module size whose rendered image still decodes.
+// Bigger modules survive thermal ink spread far better on narrow paper.
+
+// The permit PDF stores the QR as its own small image. Reading that image
+// directly gives the exact modules the department generated - unlike sampling
+// a rendered page, where tiny errors get hidden by QR error correction and
+// then rejected by stricter scanners.
+async function qrFromPdfImage(page){
+  if(typeof jsQR!=="function") return null;
+  let ops;
+  try{ ops = await page.getOperatorList(); }catch(e){ return null; }
+  const OPS = pdfjsLib.OPS || {};
+  const wanted = [OPS.paintImageXObject, OPS.paintJpegXObject,
+                  OPS.paintImageXObjectRepeat].filter(v=>v!==undefined);
+  const names = [];
+  for(let i=0;i<ops.fnArray.length;i++)
+    if(wanted.indexOf(ops.fnArray[i])>=0){
+      const a=ops.argsArray[i];
+      if(a && typeof a[0]==="string") names.push(a[0]);
+    }
+  for(const name of names){
+    let obj=null;
+    try{
+      obj = await new Promise((res)=>{
+        let done=false;
+        try{ page.objs.get(name, v=>{ done=true; res(v); }); }catch(e){ res(null); }
+        setTimeout(()=>{ if(!done) res(null); }, 3000);
+      });
+    }catch(e){}
+    if(!obj) continue;
+    const cvs = imageObjToCanvas(obj);
+    if(!cvs) continue;
+    const w=cvs.width, h=cvs.height;
+    if(w<20||h<20||w>700||h>700) continue;
+    if(Math.abs(w-h) > Math.max(6, w*0.15)) continue;      // QR is square
+    const ctx=cvs.getContext("2d");
+    const res=jsQR(ctx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:"attemptBoth"});
+    if(res && res.data) return {canvas:cvs, result:res};
+  }
+  return null;
+}
+
+function imageObjToCanvas(obj){
+  try{
+    if(obj.bitmap){                       // newer pdf.js returns an ImageBitmap
+      const c=document.createElement("canvas");
+      c.width=obj.bitmap.width; c.height=obj.bitmap.height;
+      c.getContext("2d").drawImage(obj.bitmap,0,0);
+      return c;
+    }
+    const w=obj.width, h=obj.height, src=obj.data;
+    if(!w||!h||!src) return null;
+    const c=document.createElement("canvas");
+    c.width=w; c.height=h;
+    const ctx=c.getContext("2d");
+    const out=ctx.createImageData(w,h);
+    const n=w*h;
+    if(src.length>=n*4){                                  // RGBA
+      out.data.set(src.subarray(0,n*4));
+    } else if(src.length>=n*3){                           // RGB
+      for(let i=0,j=0;i<n;i++,j+=3){
+        out.data[i*4]=src[j]; out.data[i*4+1]=src[j+1];
+        out.data[i*4+2]=src[j+2]; out.data[i*4+3]=255;
+      }
+    } else if(src.length>=n){                             // 8-bit grey
+      for(let i=0;i<n;i++){
+        const v=src[i];
+        out.data[i*4]=out.data[i*4+1]=out.data[i*4+2]=v; out.data[i*4+3]=255;
+      }
+    } else {                                              // 1-bit packed
+      const rowBytes=Math.ceil(w/8);
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const byte=src[y*rowBytes+(x>>3)];
+        const bit=(byte>>(7-(x&7)))&1;
+        const v=bit?255:0;
+        const i=(y*w+x)*4;
+        out.data[i]=out.data[i+1]=out.data[i+2]=v; out.data[i+3]=255;
+      }
+    }
+    ctx.putImageData(out,0,0);
+    return c;
+  }catch(e){ return null; }
+}
+
+// Crop the code area out of the embedded image. The result is the
+// department's own pixels - we only enlarge them by a whole number later.
+function cropCodeFromImage(cvs){
+  const w=cvs.width, h=cvs.height;
+  const ctx=cvs.getContext("2d");
+  const d=ctx.getImageData(0,0,w,h).data;
+  const dark=(x,y)=>{const i=((y*w)+x)*4; return (d[i]+d[i+1]+d[i+2])/3 < 128;};
+  let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+    if(dark(x,y)){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<x0||y1<y0) return null;
+  const cw=x1-x0+1, ch=y1-y0+1;
+  const out=document.createElement("canvas");
+  out.width=cw; out.height=ch;
+  const octx=out.getContext("2d");
+  octx.imageSmoothingEnabled=false;
+  octx.drawImage(cvs, x0,y0,cw,ch, 0,0,cw,ch);
+  out.codePx = cw;
+  return out;
+}
+
+// Some permits store 2-3 pixels per module. Each block is uniform, so taking
+// one pixel per block is exact - and lets the code print noticeably bigger.
+function reduceToModules(codeCanvas, N){
+  const f = (N && codeCanvas.width % N === 0) ? codeCanvas.width / N : 1;
+  if(f <= 1) return codeCanvas;
+  const out=document.createElement("canvas");
+  out.width=out.height=N;
+  const octx=out.getContext("2d");
+  octx.imageSmoothingEnabled=false;
+  octx.drawImage(codeCanvas, 0,0, codeCanvas.width, codeCanvas.height, 0,0, N, N);
+  return out;
+}
+
+// Turn the clean embedded image into an exact module grid.
+function modulesFromCleanImage(cvs, res){
+  const N = (res.version||0)*4 + 17;
+  const w=cvs.width, h=cvs.height;
+  const d=cvs.getContext("2d").getImageData(0,0,w,h).data;
+  const dark=(x,y)=>{const i=((y*w)+x)*4; return (d[i]+d[i+1]+d[i+2])/3 < 128;};
+  // dark bounding box = the code itself, without its white quiet zone
+  let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+    if(dark(x,y)){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<x0||y1<y0) return null;
+  const bw=(x1-x0+1)/N, bh=(y1-y0+1)/N;
+  const mods=new Uint8Array(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    // majority vote inside each module cell -> immune to rounding
+    let votes=0, total=0;
+    for(const fy of [0.3,0.5,0.7])for(const fx of [0.3,0.5,0.7]){
+      const px=Math.round(x0+(i+fx)*bw), py=Math.round(y0+(j+fy)*bh);
+      if(px<0||py<0||px>=w||py>=h) continue;
+      total++; if(dark(px,py)) votes++;
+    }
+    if(total && votes*2>total) mods[j*N+i]=1;
+  }
+  return {mods, N};
+}
+
+function pickQrScale(mods, N, W){
+  const off=document.createElement("canvas"), octx=off.getContext("2d");
+  for(let k=Math.floor(W/N); k>=2; k--){
+    const qz=Math.max(0, Math.floor((W - N*k)/(2*k)));   // spare dots -> quiet zone
+    const grid=N+2*qz, size=k*grid;
+    if(size>W) continue;
+    // test it exactly as it prints: centred on white paper with margins
+    const pad=6*k;
+    off.width=W; off.height=size+2*pad;
+    octx.fillStyle="#fff"; octx.fillRect(0,0,off.width,off.height);
+    octx.fillStyle="#000";
+    const ox=Math.floor((W-size)/2);
+    for(let j=0;j<N;j++)for(let i=0;i<N;i++)
+      if(mods[j*N+i]) octx.fillRect(ox+(i+qz)*k, pad+(j+qz)*k, k, k);
+    if(typeof jsQR!=="function") return {k,qz};
+    const chk=jsQR(octx.getImageData(0,0,off.width,off.height).data,off.width,off.height);
+    if(chk && chk.data) return {k,qz};
+  }
+  return {k:Math.max(2,Math.floor(W/(N+8))), qz:4};
+}
+
+function drawReceipt(p){
+  const W = paperDots;
+  const paper = W<=448 ? 48 : 72;              // printable mm
+  const sc = (W/paper)/8;                       // 8 dots/mm reference
+  const M = Math.round(12*sc), CW = W-2*M;
+  const cv=$("receipt"); cv.width = W;
+  const c=cv.getContext("2d");
+  let y=0, draw=false, qrBox=null, qrModuleDots=0;
+
+  const font=(sz,b)=>`${b?"bold ":""}${sz*sc}px Arial, sans-serif`;
+  const tw=(s,sz,b)=>{c.font=font(sz,b);return c.measureText(s).width;};
+  const MINPT=18;   // never shrink below this: wrap instead
+  const fit=(s,max,b)=>{let sz=max;while(sz>MINPT&&tw(s,sz,b)>CW)sz-=0.5;return sz;};
+  const wrap=(s,sz,b)=>{c.font=font(sz,b);const out=[];let cur="";
+    for(const w of s.split(" ")){const t=cur?cur+" "+w:w;
+      if(c.measureText(t).width<=CW)cur=t;else{if(cur)out.push(cur);cur=w;}}
+    if(cur)out.push(cur);return out.length?out:[""];};
+  const line=(s,sz,b,center,lead=1.25)=>{for(const ln of wrap(s,sz,b)){y+=sz*sc*lead;
+    if(draw){c.font=font(sz,b);c.fillStyle="#000";
+      c.fillText(ln,center?(W-c.measureText(ln).width)/2:M,y);}}};
+  const fitLine=(s,max)=>line(s,fit(s,max,false),false);
+  // Prints "Label : value" on one line when it fits at a readable size;
+  // otherwise prints the label, then wraps the value - never shrinks to unreadable.
+  const MINSZ = 19;                       // smallest allowed body text
+  const field=(label,value,max)=>{
+    const one = label + " : " + value;
+    const sz = fit(one, max||VAL, false);
+    if(sz >= MINSZ){ line(one, sz, false); return; }
+    line(label + " :", LBL, false);
+    line(String(value), Math.max(MINSZ, fit(String(value), max||VAL, false)), false);
+  };
+  const gap=px=>y+=px*sc;
+  const rule=()=>{gap(7);if(draw){c.fillStyle="#000";c.fillRect(M,y,CW,Math.max(1,2*sc));}gap(9);};
+  const thinRule=()=>{gap(5);if(draw){c.fillStyle="#000";c.fillRect(M+40*sc,y,CW-80*sc,1);}gap(7);};
+  const bar=t=>{gap(2);const bh=31;
+    if(draw){c.fillStyle="#000";c.fillRect(M,y,CW,bh);
+      c.font=font(21,true);c.fillStyle="#fff";
+      c.fillText(t,(W-c.measureText(t).width)/2,y+bh-9);}
+    y+=bh;gap(9);};
+
+  const LBL=18, VAL=25, BIG=28, TRIP=18;
+  const qrH = p.qr ? Math.round(CW*p.qr.height/p.qr.width) : 0;
+
+  const pass=()=>{
+    y=0;
+    // QR untouched: nearest-neighbour scaling, full width, nothing drawn over it
+    if(!p.qr){
+      line("[ QR NOT READABLE ]",22,true,true);
+      line("Carry the original PDF for scanning",17,false,true);
+    } else if(p.qr.exact){
+      // EXACT REPLICA, ENLARGED BY A WHOLE NUMBER: the image object from the
+      // PDF with every pixel drawn as an identical k x k block of printer
+      // dots. The code is unchanged - only physically larger, which is what
+      // thermal paper needs to be scannable.
+      const src = p.qr.exact;
+      const k = Math.max(1, Math.floor((W - 8) / src.width));
+      const size = k * src.width;
+      const x0 = Math.max(0, Math.floor((W - size) / 2));
+      const pad = Math.max(24, 4*k);               // >= 4 modules of white
+      if(draw){
+        c.fillStyle = "#fff";
+        c.fillRect(0, y, W, size + 2*pad);
+        c.imageSmoothingEnabled = false;
+        c.drawImage(src, x0, y + pad, size, size);   // integer upscale
+        c.imageSmoothingEnabled = true;
+        qrBox = {x:x0, y:y+pad, w:size, h:size};
+      }
+      y += size + 2*pad;
+    } else if(p.qr.isModule && p.qr.mods){
+      const N=p.qr.N, mods=p.qr.mods;
+      const sc2 = p.qr.scale || (p.qr.scale = pickQrScale(mods, N, W));
+      const k=sc2.k, qz=sc2.qz;
+      const grid=N+2*qz, size=k*grid, x0=Math.floor((W-size)/2);
+      const topPad = Math.max(24, 3*k);        // white paper above the code
+      if(draw){
+        c.fillStyle="#fff"; c.fillRect(0,y,W,size+topPad+3*k);
+        c.fillStyle="#000";
+        for(let j=0;j<N;j++)for(let i=0;i<N;i++)
+          if(mods[j*N+i]) c.fillRect(x0+(i+qz)*k, y+topPad+(j+qz)*k, k, k);
+        qrBox={x:x0,y:y+topPad,w:size,h:size};
+      }
+      y+=topPad+size+3*k;
+      qrModuleDots=k;
+    } else if(p.qr.isModule){
+      const cap=Math.floor(50*(W/paper));
+      const k=Math.max(1,Math.floor(Math.min(CW,cap)/p.qr.width));
+      const size=k*p.qr.width;
+      if(draw){
+        c.imageSmoothingEnabled=false;
+        c.drawImage(p.qr,M+Math.floor((CW-size)/2),y,size,size);
+        c.imageSmoothingEnabled=true;
+      }
+      y+=size;
+    } else {
+      if(draw){
+        c.imageSmoothingEnabled=false;
+        c.drawImage(p.qr,M,y,CW,qrH);
+        c.imageSmoothingEnabled=true;
+        qrBox={x:M,y:y,w:CW,h:qrH};
+      }
+      y+=qrH;
+    }
+    gap(11);
+
+    line("GOVERNMENT OF",27,true,true);
+    line("ANDHRA PRADESH",27,true,true);
+    line("Department of Agricultural Marketing",
+         fit("Department of Agricultural Marketing",24,true),true,true,1.3);
+    for(const [b2,sz,s] of [
+      [false,21,"(Agri Produce & Livestock) Market Rules, 1969"],
+      [false,21,"Section-12 and Rule 74-A"],
+      [true,22,"e-Transport Permit for Transportation of"],
+      [true,22,"Notified Agricultural Produce"]])
+      line(s,fit(s,sz,b2),b2,true,1.3);
+    rule();
+
+    fitLine(`PERMIT NO : ${p.permitNo}`,BIG); gap(6);
+    fitLine(`PERMIT TYPE : ${p.permitType}`,BIG); gap(6);
+    fitLine(`DATE & TIME : ${p.dateTime}`,BIG);
+    rule();
+
+    if(p.kind==="market"){
+      bar("MARKET YARD INFORMATION");
+      fitLine(p.amcName,VAL); gap(6);
+      line("Market Yard Name :",LBL,false);
+      line(p.marketYard,VAL,false);
+    } else {
+      bar("CHECK POST INFORMATION");
+      fitLine(p.amcName,VAL); gap(6);
+      field("Check Post Name", p.checkPost);
+    }
+    gap(6);
+    field("Officer Name", p.officer); gap(4);
+    field("Officer Mobile No", p.officerMob);
+    rule();
+
+    bar(p.kind==="market" ? "TRADER INFORMATION" : "SELLER INFORMATION");
+    field(p.partyLabel, p.partyName); gap(6);
+    field("Mobile No", p.partyMob); gap(6);
+    field("Address", p.address);
+    rule();
+
+    if(p.kind==="checkpost" && p.consigneeName && p.consigneeName!=="-"){
+      bar("CONSIGNEE INFORMATION");
+      fitLine(p.consigneeName,VAL); gap(6);
+      field("Mobile No", p.consigneeMob);
+      rule();
+    }
+
+    bar("COMMODITY DETAILS");
+    p.items.forEach((it,i)=>{
+      if(i>0) thinRule();
+      field("S.No", it.sNo); gap(6);
+      field("Commodity", it.name); gap(6);
+      field("Trade Value (INR)", it.trade); gap(6);
+      field("Quantity", it.qty); gap(6);
+      field(it.feeWord + " (INR)", it.fee); gap(6);
+    });
+    field("TOTAL Trade Value (INR)", p.totalTrade); gap(6);
+    line(`TOTAL ${p.items[0].feeWord} (INR) :`,LBL,false);
+    fitLine(p.totalFee,BIG);
+    rule();
+
+    if(p.kind==="checkpost"){
+      bar("TRIP DETAILS");
+      line("From :",LBL,false);
+      line(p.from,VAL,false);
+      field("Departure", p.departure); gap(5);
+      line("To :",LBL,false);
+      line(p.to,VAL,false);
+      field("Arrival", p.arrival); gap(5);
+      field("Estimated Distance", p.distance);
+      rule();
+    }
+
+    bar("TRANSPORTER INFORMATION");
+    if(p.kind==="checkpost"){ field("Transporter Name", p.transName); gap(6); }
+    field("Transporter Mobile", p.transMob); gap(6);
+    if(p.kind==="checkpost"){ field("Vehicle Type", p.vehicleType); gap(6); }
+    field("Vehicle No", p.vehicle);
+    rule();
+
+    gap(12);
+    line(p.partyName,28,true,true);
+    line("Signature of Trader / Exporter",18,false,true);
+    rule();
+    if(p.ocr){
+      line("* Details read from photo (OCR)",17,false,true);
+      line("Verify against the original permit",17,false,true);
+      gap(6);
+    }
+    for(const s of ["Government of Andhra Pradesh - Department of",
+                    "Agricultural Marketing - Computer Generated Document",
+                    `Generated on : ${p.generated}`])
+      line(s,fit(s,17,false),false,true);
+    gap(24);
+  };
+
+  pass();
+  cv.height=Math.ceil(y);
+  draw=true;
+  c.fillStyle="#fff"; c.fillRect(0,0,W,cv.height);
+  pass();
+
+  // Read the QR back off the finished receipt and decode it. This checks the
+  // exact pixels that go to the printer, not an intermediate copy.
+  cv.qrPrintOk = null;
+  cv.qrModuleDots = qrModuleDots;
+  if(qrBox && typeof jsQR==="function"){
+    try{
+      const d=c.getImageData(qrBox.x,qrBox.y,qrBox.w,qrBox.h);
+      const chk=jsQR(d.data,qrBox.w,qrBox.h);
+      cv.qrPrintOk = !!(chk && chk.data);
+      cv.qrPrintData = chk ? chk.data : "";
+    }catch(e){ cv.qrPrintOk=null; }
+  }
+}
+
+// ================= QR: find anywhere, rebuild perfectly =================
+// Detection runs on progressively larger versions of the page/photo until the
+// QR is found; the rebuild samples every module from the ORIGINAL pixels with
+// an adaptive light/dark threshold (handles photos), then the result must
+// decode to the same data before it is used.
+async function findQr(big){
+  if(typeof jsQR!=="function") return densityFallback(big);
+  for(const w of [1100, 1700, big.width]){
+    if(w > big.width && w !== big.width) continue;
+    const k = w/big.width;
+    const dc = document.createElement("canvas");
+    dc.width = Math.round(big.width*k); dc.height = Math.round(big.height*k);
+    const dctx = dc.getContext("2d");
+    dctx.drawImage(big,0,0,dc.width,dc.height);
+    const id = dctx.getImageData(0,0,dc.width,dc.height);
+    const f = jsQR(id.data, dc.width, dc.height, {inversionAttempts:"attemptBoth"});
+    if(f && f.data){
+      const up = p => ({x:p.x/k, y:p.y/k});
+      const corners = {
+        tl: up(f.location.topLeftCorner), tr: up(f.location.topRightCorner),
+        bl: up(f.location.bottomLeftCorner), br: up(f.location.bottomRightCorner)
+      };
+      const canvas = buildQr(big, corners, f.version, f.data);
+      return {canvas, data:f.data};
+    }
+  }
+  return densityFallback(big);
+}
+
+function buildQr(big, cs, version, expect){
+  const bctx = big.getContext("2d");
+  const N = version*4 + 17;
+  const {tl,tr,bl,br} = cs;
+  // Read source pixels around the QR only
+  const xs=[tl.x,tr.x,bl.x,br.x], ys=[tl.y,tr.y,bl.y,br.y];
+  const pad=Math.max(8,(Math.max(...xs)-Math.min(...xs))*0.1);
+  const gx0=Math.max(0,Math.floor(Math.min(...xs)-pad)), gy0=Math.max(0,Math.floor(Math.min(...ys)-pad));
+  const gx1=Math.min(big.width,Math.ceil(Math.max(...xs)+pad)), gy1=Math.min(big.height,Math.ceil(Math.max(...ys)+pad));
+  const gw=gx1-gx0, gh=gy1-gy0;
+  const data = bctx.getImageData(gx0,gy0,gw,gh).data;
+  const gray=(x,y)=>{x=Math.round(x-gx0);y=Math.round(y-gy0);
+    if(x<0||y<0||x>=gw||y>=gh)return 255;
+    const i=(y*gw+x)*4;
+    return (data[i]+data[i+1]+data[i+2])/3;};
+
+  // Bilinear map of module centres across all four corners (handles photo tilt)
+  const at=(u,v)=>({
+    x:(1-u)*(1-v)*tl.x + u*(1-v)*tr.x + (1-u)*v*bl.x + u*v*br.x,
+    y:(1-u)*(1-v)*tl.y + u*(1-v)*tr.y + (1-u)*v*bl.y + u*v*br.y});
+
+  // First pass: collect brightness of every module centre -> adaptive threshold
+  const g=new Float32Array(N*N);
+  const mw=(tr.x-tl.x)/N, mh=(bl.y-tl.y)/N;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const p=at((i+0.5)/N,(j+0.5)/N);
+    let s=0;
+    for(const [dx,dy] of [[0,0],[0.3,0],[-0.3,0],[0,0.3],[0,-0.3]])
+      s+=gray(p.x+dx*mw,p.y+dy*mh);
+    g[j*N+i]=s/5;
+  }
+  const sorted=Array.from(g).sort((a,b)=>a-b);
+  const lo=sorted[Math.floor(sorted.length*0.05)], hi=sorted[Math.floor(sorted.length*0.95)];
+  const th=(lo+hi)/2;
+
+  const q=4;
+  const out=document.createElement("canvas");
+  out.width=out.height=N+2*q;
+  const octx=out.getContext("2d");
+  octx.fillStyle="#fff"; octx.fillRect(0,0,out.width,out.height);
+  octx.fillStyle="#000";
+  const mods=new Uint8Array(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++)
+    if(g[j*N+i]<th){ mods[j*N+i]=1; octx.fillRect(i+q,j+q,1,1); }
+
+  // Must decode to identical data, else fall back to a plain padded crop
+  if(typeof jsQR==="function"){
+    const S=8, vc=document.createElement("canvas");
+    vc.width=vc.height=out.width*S;
+    const vctx=vc.getContext("2d");
+    vctx.imageSmoothingEnabled=false;
+    vctx.drawImage(out,0,0,vc.width,vc.height);
+    const chk=jsQR(vctx.getImageData(0,0,vc.width,vc.height).data,vc.width,vc.height);
+    if(chk && chk.data===expect){
+      out.verified=true; out.isModule=true; out.mods=mods; out.N=N;
+      return out;
+    }
+  }
+  const crop=document.createElement("canvas");
+  crop.width=gw; crop.height=gh;
+  crop.getContext("2d").drawImage(big,gx0,gy0,gw,gh,0,0,gw,gh);
+  crop.verified=false;
+  return crop;
+}
+
+// Last resort for clean PDFs when the QR library is unavailable
+function densityFallback(big){
+  const ctx=big.getContext("2d");
+  const w=big.width,h=big.height;
+  const rx=Math.floor(w*0.60), rw=w-rx, rh=Math.floor(h*0.25);
+  const img=ctx.getImageData(rx,0,rw,rh);
+  const dark=(x,y)=>{const i=(y*rw+x)*4;
+    return (img.data[i]+img.data[i+1]+img.data[i+2])/3<100;};
+  const col=new Array(rw).fill(0);
+  for(let y=0;y<rh;y++)for(let x=0;x<rw;x++)if(dark(x,y))col[x]++;
+  const max=Math.max(...col), th=Math.max(3,max*0.3);
+  let xe=-1;for(let x=rw-1;x>=0;x--)if(col[x]>=th){xe=x;break;}
+  if(xe<0)return null;
+  let xs=xe,g=0;
+  for(let x=xe;x>=0;x--){if(col[x]>=th){xs=x;g=0;}else if(++g>20)break;}
+  const rowIn=new Array(rh).fill(0);
+  for(let y=0;y<rh;y++)for(let x=xs;x<=xe;x++)if(dark(x,y))rowIn[y]++;
+  let ys=-1;for(let y=0;y<rh;y++)if(rowIn[y]>=3){ys=y;break;}
+  if(ys<0)return null;
+  let ye=ys;g=0;
+  for(let y=ys;y<rh;y++){if(rowIn[y]>=3){ye=y;g=0;}else if(++g>20)break;}
+  const pad=Math.round((xe-xs)*0.2);
+  const cx=Math.max(0,xs-pad),cy=Math.max(0,ys-pad);
+  const cw=Math.min(rw-cx,xe-xs+2*pad),ch=Math.min(rh-cy,ye-ys+2*pad);
+  if(cw<40||ch<40)return null;
+  const out=document.createElement("canvas");
+  out.width=cw;out.height=ch;
+  out.getContext("2d").drawImage(big,rx+cx,cy,cw,ch,0,0,cw,ch);
+  out.verified=false;
+  return {canvas:out, data:null};
+}
+
+// ================= Output actions =================
+$("printBtn").onclick=()=>{
+  const dataUrl=$("receipt").toDataURL("image/png");
+  if (window.AndroidPrinter) {
+    try { AndroidPrinter.print(dataUrl, paperDots); }
+    catch(e) { AndroidPrinter.print(dataUrl); }
+    if(lastPermit) saveToHistory(lastPermit);
+    setStatus("Printing on " + (paperDots<=448?"58mm":"80mm") + " paper\u2026","ok");
+    return;
+  }
+  window.location.href="rawbt:"+dataUrl;
+  setStatus("Sent to RawBT. If nothing happened, install RawBT from Play Store or use Share.","ok");
+};
+$("shareBtn").onclick=async()=>{
+  try{
+    const blob=await new Promise(r=>$("receipt").toBlob(r,"image/png"));
+    const f=new File([blob],"permit-receipt.png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[f]}))
+      await navigator.share({files:[f],title:"Permit receipt"});
+    else setStatus("Sharing not supported here — use Download instead.","err");
+  }catch(e){}
+};
+if (window.AndroidPrinter) { const b=$("sysBtn"); if(b) b.style.display="none"; }
+$("sysBtn").onclick=()=>{
+  const dataUrl=$("receipt").toDataURL("image/png");
+  const win=window.open("","_blank");
+  const pw = paperDots<=448 ? [58,48] : [80,72];
+  win.document.write(`<!DOCTYPE html><html><head><title>Print</title><style>
+    @page{size:${pw[0]}mm auto;margin:0}
+    html,body{margin:0;padding:0}
+    img{width:${pw[1]}mm;display:block;margin:0 auto;image-rendering:pixelated}
+  </style></head><body>
+    <img src="${dataUrl}" onload="window.print()">
+  </body></html>`);
+  win.document.close();
+};
+
+$("bigQrBtn").onclick=()=>{
+  const r=$("receipt");
+  const src=window._lastQr;
+  if(!src || !src.mods) return;
+  const N=src.N, k=8, qz=4, grid=N+2*qz;
+  const c=$("bigQr"); c.width=c.height=grid*k;
+  const x=c.getContext("2d");
+  x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
+  x.fillStyle="#000";
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++)
+    if(src.mods[j*N+i]) x.fillRect((i+qz)*k,(j+qz)*k,k,k);
+  $("qrModal").style.display="flex";
+};
+$("closeQr").onclick=()=>{ $("qrModal").style.display="none"; };
+
+$("dlBtn").onclick=()=>{
+  const a=document.createElement("a");
+  a.href=$("receipt").toDataURL("image/png");
+  a.download="permit-receipt.png";a.click();
+};
+</script>
+</body>
+</html>
