@@ -32,9 +32,9 @@ class MainActivity : Activity() {
     companion object {
         /** Latest-release info straight from GitHub - no file to edit. */
         const val RELEASES_API =
-            "https://api.github.com/repos/Bhargava0205/Permit-Printer-Beta/releases/latest"
+            "https://api.github.com/repos/Madhavi-Bollineni/Permit-Printer-Beta/releases/latest"
         const val RELEASES_PAGE =
-            "https://github.com/Bhargava0205/Permit-Printer-Beta/releases/latest"
+            "https://github.com/Madhavi-Bollineni/Permit-Printer-Beta/releases/latest"
     }
 
     /** The version baked in by the build - never edited by hand. */
@@ -146,8 +146,8 @@ class MainActivity : Activity() {
         fun projectInfo(): String =
             "AMC PERMIT PRINT - PROJECT INFORMATION\n" +
             "======================================\n\n" +
-            "Repository:\n  github.com/Bhargava0205/Permit-Printer-Beta\n\n" +
-            "APK link (always newest):\n  github.com/Bhargava0205/Permit-Printer-Beta/releases/latest/download/app-permit-print.apk\n\n" +
+            "Repository:\n  github.com/Madhavi-Bollineni/Permit-Printer-Beta\n\n" +
+            "APK link (always newest):\n  github.com/Madhavi-Bollineni/Permit-Printer-Beta/releases/latest/download/app-permit-print.apk\n\n" +
             "How a release happens:\n  Any push to the repo builds automatically.\n  Version = build number (run 15 = v2.5, run 16 = v2.6...).\n  Nothing to edit for versioning.\n\n" +
             "Signing (needed for updates to install):\n  4 GitHub secrets: KEYSTORE_B64, KEYSTORE_PASSWORD,\n  KEY_ALIAS, KEY_PASSWORD.\n  Key file backup: PROJECT_VAULT.zip (kept privately\n  by the developer - NOT in this app or the repo).\n\n" +
             "If everything is lost:\n  Give the PROJECT_VAULT.zip to Claude (claude.ai)\n  and say: restore the AMC Permit Print project.\n  It contains the full source, keys and instructions.\n\n" +
@@ -438,3 +438,4 @@ class MainActivity : Activity() {
         printer.disconnect()
     }
 }
+
